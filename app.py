@@ -2,25 +2,22 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-from io import StringIO
+from typing import Optional
 
-# -------------------------------------------------
-# Page config
-# -------------------------------------------------
+# =========================================================
+# CONFIG
+# =========================================================
 st.set_page_config(
     page_title="KAI JourneySense Dashboard",
     page_icon="🚆",
     layout="wide"
 )
 
-# -------------------------------------------------
-# Styling (simple, clean)
-# -------------------------------------------------
 st.markdown(
     """
     <style>
       .block-container { padding-top: 1.2rem; padding-bottom: 1.2rem; }
-      div[data-testid="stMetricValue"] { font-size: 1.6rem; }
+      div[data-testid="stMetricValue"] { font-size: 1.55rem; }
       div[data-testid="stMetricLabel"] { font-size: 0.9rem; }
       .small-note { color: #6B7280; font-size: 0.9rem; }
     </style>
@@ -28,16 +25,84 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# -------------------------------------------------
-# Data utilities
-# -------------------------------------------------
 EXPECTED_COLS = [
     "date", "country", "language", "route", "purpose",
     "ticket_class", "touchpoint", "satisfaction",
     "positive_feedback", "pain_point"
 ]
 
-def make_dummy_data(n: int = 800) -> pd.DataFrame:
+# =========================================================
+# KAI STAR (Conceptual) - Tourism Recommendation Data
+# =========================================================
+KAI_STAR_SCALE = {
+    3: "★★★ KAI Star – Wajib Dikunjungi",
+    2: "★★ KAI Star – Sangat Direkomendasikan",
+    1: "★ KAI Star – Direkomendasikan",
+}
+
+ROUTE_TO_DEST = {
+    "Jakarta–Bandung": "Bandung",
+    "Jakarta–Yogyakarta": "Yogyakarta",
+    "Jakarta–Surabaya": "Surabaya",
+    "Bandung–Yogyakarta": "Yogyakarta",
+    "Yogyakarta–Surabaya": "Surabaya",
+    "Surabaya–Malang": "Malang",
+}
+
+# Konseptual: rating internal KAI (bukan rating publik resmi)
+KAI_TOURISM_RECS = {
+    "Bandung": [
+        {"place": "Kawah Putih Ciwidey", "kai_star": 3, "category": "Nature",
+         "why": "Pengalaman alam unik, visual kuat, cocok wisatawan internasional."},
+        {"place": "Jalan Braga", "kai_star": 2, "category": "Heritage & City Walk",
+         "why": "Ikonik, mudah diakses, city vibe & foto."},
+        {"place": "Gedung Sate", "kai_star": 2, "category": "Landmark",
+         "why": "Landmark kota, pengalaman singkat namun memorable."},
+    ],
+    "Yogyakarta": [
+        {"place": "Candi Prambanan", "kai_star": 3, "category": "UNESCO Heritage",
+         "why": "Destinasi kelas dunia, nilai budaya tinggi."},
+        {"place": "Keraton Yogyakarta", "kai_star": 3, "category": "Culture",
+         "why": "Pengalaman budaya autentik dan edukatif."},
+        {"place": "Malioboro", "kai_star": 2, "category": "City Experience",
+         "why": "Pusat pengalaman kota, kuliner, dan belanja."},
+    ],
+    "Surabaya": [
+        {"place": "Tugu Pahlawan", "kai_star": 2, "category": "History",
+         "why": "Ikon sejarah nasional, mudah dijangkau."},
+        {"place": "Kota Tua Surabaya (Kembang Jepun)", "kai_star": 2, "category": "Heritage",
+         "why": "Area heritage cocok untuk city photography."},
+        {"place": "House of Sampoerna", "kai_star": 1, "category": "Museum",
+         "why": "Museum populer dengan pengalaman tur singkat."},
+    ],
+    "Malang": [
+        {"place": "Bromo (akses via Malang)", "kai_star": 3, "category": "Nature",
+         "why": "Destinasi internasional, pengalaman sunrise ikonik."},
+        {"place": "Kampung Warna-Warni Jodipan", "kai_star": 2, "category": "City Spot",
+         "why": "Visual kuat, cocok untuk wisata singkat."},
+        {"place": "Alun-Alun Malang", "kai_star": 1, "category": "City Experience",
+         "why": "Ruang publik nyaman untuk wisata santai."},
+    ],
+}
+
+def get_destination_city(route: str) -> Optional[str]:
+    return ROUTE_TO_DEST.get(route)
+
+def build_kai_star_table(city: str) -> pd.DataFrame:
+    items = KAI_TOURISM_RECS.get(city, [])
+    if not items:
+        return pd.DataFrame(columns=["KAI Star", "Tempat", "Kategori", "Alasan singkat"])
+    df_rec = pd.DataFrame(items)
+    df_rec["KAI Star"] = df_rec["kai_star"].map(KAI_STAR_SCALE)
+    df_rec = df_rec.rename(columns={"place": "Tempat", "category": "Kategori", "why": "Alasan singkat"})
+    df_rec = df_rec[["KAI Star", "Tempat", "Kategori", "Alasan singkat", "kai_star"]]
+    df_rec = df_rec.sort_values(["kai_star", "Tempat"], ascending=[False, True]).drop(columns=["kai_star"])
+    return df_rec
+
+# =========================================================
+# DATA: Dummy + Validation
+# =========================================================
+def make_dummy_data(n: int = 900) -> pd.DataFrame:
     import random
 
     countries = [
@@ -50,17 +115,11 @@ def make_dummy_data(n: int = 800) -> pd.DataFrame:
         "India": "English", "USA": "English", "UK": "English",
         "Germany": "German", "France": "French", "Netherlands": "English"
     }
-    routes = [
-        "Jakarta–Bandung",
-        "Jakarta–Yogyakarta",
-        "Jakarta–Surabaya",
-        "Bandung–Yogyakarta",
-        "Yogyakarta–Surabaya",
-        "Surabaya–Malang"
-    ]
-    travel_purpose = ["Leisure", "Business", "Family", "Backpacking"]
-    ticket_class = ["Economy", "Executive", "Luxury/Pariwisata"]
+    routes = list(ROUTE_TO_DEST.keys())
+    purposes = ["Leisure", "Business", "Family", "Backpacking"]
+    classes = ["Economy", "Executive", "Luxury/Pariwisata"]
     touchpoints = ["Website/App", "Station", "On-train", "Customer Service"]
+
     pain_points = [
         "Language barrier at station",
         "Ticketing confusion",
@@ -83,17 +142,14 @@ def make_dummy_data(n: int = 800) -> pd.DataFrame:
         c = random.choice(countries)
         lang = languages.get(c, "English")
         r = random.choice(routes)
-        p = random.choice(travel_purpose)
-        cls = random.choice(ticket_class)
+        p = random.choice(purposes)
+        cls = random.choice(classes)
         tp = random.choice(touchpoints)
 
+        # satisfaction slightly higher for Executive/Luxury
         base = 4.05 if cls == "Economy" else (4.35 if cls == "Executive" else 4.55)
         sat = max(1.0, min(5.0, random.gauss(base, 0.35)))
 
-        pos = random.choice(positives)
-        neg = random.choice(pain_points)
-
-        # pseudo dates within a year
         year = 2025
         month = random.randint(1, 12)
         day = random.randint(1, 28)
@@ -108,8 +164,8 @@ def make_dummy_data(n: int = 800) -> pd.DataFrame:
             "ticket_class": cls,
             "touchpoint": tp,
             "satisfaction": round(sat, 2),
-            "positive_feedback": pos,
-            "pain_point": neg
+            "positive_feedback": random.choice(positives),
+            "pain_point": random.choice(pain_points)
         })
 
     return pd.DataFrame(rows)
@@ -119,17 +175,17 @@ def validate_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"CSV missing columns: {missing}")
 
-    # Clean
     df = df.copy()
+
     df["satisfaction"] = pd.to_numeric(df["satisfaction"], errors="coerce")
     df = df.dropna(subset=["satisfaction"])
     df["satisfaction"] = df["satisfaction"].clip(1, 5)
 
-    # Normalize text cols
-    for c in ["country","language","route","purpose","ticket_class","touchpoint","positive_feedback","pain_point"]:
+    # Normalize text columns
+    for c in ["country", "language", "route", "purpose", "ticket_class", "touchpoint", "positive_feedback", "pain_point"]:
         df[c] = df[c].astype(str).str.strip()
 
-    # Parse date best-effort
+    # Parse date
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date"])
     df["date"] = df["date"].dt.date
@@ -139,60 +195,62 @@ def validate_and_clean(df: pd.DataFrame) -> pd.DataFrame:
 def df_to_csv_bytes(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
 
-# -------------------------------------------------
-# Sidebar
-# -------------------------------------------------
+# =========================================================
+# SIDEBAR
+# =========================================================
 st.sidebar.title("⚙️ Settings")
-st.sidebar.caption("Data source & filters")
+
+lang_mode = st.sidebar.selectbox("Language", ["English", "Bilingual (EN/ID)"], index=1)
+
+def t(en: str, idn: str) -> str:
+    return en if lang_mode == "English" else f"{en}\n{idn}"
 
 data_mode = st.sidebar.radio(
-    "Data source",
-    ["Use dummy data (recommended for proposal)", "Upload CSV"],
+    t("Data source", "Sumber data"),
+    [t("Use dummy data (recommended for proposal)", "Gunakan dummy data (disarankan untuk proposal)"),
+     t("Upload CSV", "Unggah CSV")],
     index=0
 )
 
 uploaded = None
-if data_mode == "Upload CSV":
-    uploaded = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
+if "Upload CSV" in data_mode:
+    uploaded = st.sidebar.file_uploader(t("Upload CSV file", "Unggah file CSV"), type=["csv"])
     st.sidebar.markdown(
-        "<div class='small-note'>CSV must include columns: "
-        + ", ".join(EXPECTED_COLS) + "</div>",
+        "<div class='small-note'>CSV columns: " + ", ".join(EXPECTED_COLS) + "</div>",
         unsafe_allow_html=True
     )
 
-lang_mode = st.sidebar.selectbox("Language", ["English", "Bilingual (EN/ID)"], index=0)
-
 # Load data
-if data_mode == "Use dummy data (recommended for proposal)":
-    df = make_dummy_data(900)
-    df = validate_and_clean(df)
+if "dummy" in data_mode.lower():
+    df = validate_and_clean(make_dummy_data(1000))
 else:
     if uploaded is None:
-        st.warning("Please upload a CSV file, or switch to dummy data.")
+        st.warning(t("Please upload a CSV file, or switch to dummy data.",
+                     "Silakan unggah CSV, atau gunakan dummy data."))
         st.stop()
     try:
         df_raw = pd.read_csv(uploaded)
         df = validate_and_clean(df_raw)
     except Exception as e:
-        st.error(f"Failed to read/validate CSV: {e}")
+        st.error(f"{t('Failed to read/validate CSV', 'Gagal membaca/memvalidasi CSV')}: {e}")
         st.stop()
 
 # Filters
-st.sidebar.subheader("Filters")
+st.sidebar.subheader(t("Filters", "Filter"))
 countries = sorted(df["country"].unique())
 routes = sorted(df["route"].unique())
 classes = sorted(df["ticket_class"].unique())
 purposes = sorted(df["purpose"].unique())
 
-sel_country = st.sidebar.multiselect("Country", countries, default=countries)
-sel_route = st.sidebar.multiselect("Route", routes, default=routes)
-sel_class = st.sidebar.multiselect("Ticket Class", classes, default=classes)
-sel_purpose = st.sidebar.multiselect("Purpose", purposes, default=purposes)
+sel_country = st.sidebar.multiselect(t("Country", "Negara"), countries, default=countries)
+sel_route = st.sidebar.multiselect(t("Route", "Rute"), routes, default=routes)
+sel_class = st.sidebar.multiselect(t("Ticket Class", "Kelas"), classes, default=classes)
+sel_purpose = st.sidebar.multiselect(t("Purpose", "Tujuan perjalanan"), purposes, default=purposes)
 
 min_date = df["date"].min()
 max_date = df["date"].max()
 date_range = st.sidebar.date_input(
-    "Date range",
+    t("Date range", "Rentang tanggal"),
     value=(min_date, max_date),
     min_value=min_date,
     max_value=max_date
@@ -211,26 +269,20 @@ filtered = df[
     & (df["date"] <= end_date)
 ].copy()
 
-# -------------------------------------------------
-# Copy text helpers
-# -------------------------------------------------
-def t(en: str, idn: str) -> str:
-    return en if lang_mode == "English" else f"{en}\n{idn}"
-
-# -------------------------------------------------
-# Header
-# -------------------------------------------------
+# =========================================================
+# HEADER
+# =========================================================
 st.title("🚆 KAI JourneySense – International Tourism Insight Dashboard")
 st.caption(
     t(
-        "Conceptual dashboard to support data-driven branding and personalized journey experience.",
-        "Dashboard konseptual untuk mendukung branding berbasis data dan pengalaman perjalanan yang lebih personal."
+        "Conceptual dashboard to support data-driven branding and journey experience for international tourists.",
+        "Dashboard konseptual untuk mendukung branding berbasis data dan pengalaman perjalanan wisatawan internasional."
     )
 )
 
-# -------------------------------------------------
-# KPIs
-# -------------------------------------------------
+# =========================================================
+# KPI
+# =========================================================
 total = len(filtered)
 avg_sat = float(filtered["satisfaction"].mean()) if total else 0.0
 top_country = filtered["country"].value_counts().index[0] if total else "-"
@@ -246,20 +298,20 @@ k5.metric(t("Below 4.0 share", "Proporsi < 4.0"), f"{low_sat_share:.1f}%")
 
 st.divider()
 
-# -------------------------------------------------
-# Executive Summary (juri-friendly)
-# -------------------------------------------------
+# =========================================================
+# EXEC SUMMARY
+# =========================================================
 st.subheader(t("Executive Summary", "Ringkasan Eksekutif"))
-
 if total == 0:
-    st.info(t("No data after filters. Please adjust filters.", "Tidak ada data setelah filter. Silakan ubah filter."))
+    st.info(t("No data after filters. Please adjust filters.",
+              "Tidak ada data setelah filter. Silakan ubah filter."))
 else:
     worst_touch = filtered.groupby("touchpoint")["satisfaction"].mean().sort_values().index[0]
     worst_route = filtered.groupby("route")["satisfaction"].mean().sort_values().index[0]
     top_pain = filtered["pain_point"].value_counts().index[0]
     top_pos = filtered["positive_feedback"].value_counts().index[0]
 
-    summary = [
+    bullets = [
         t(f"Priority touchpoint to improve: {worst_touch}.",
           f"Touchpoint prioritas untuk ditingkatkan: {worst_touch}."),
         t(f"Route needing attention: {worst_route}.",
@@ -269,70 +321,63 @@ else:
         t(f"Brand strength to amplify: {top_pos}.",
           f"Kekuatan layanan untuk diperkuat: {top_pos}."),
     ]
-    for s in summary:
-        st.write("• " + s)
+    for b in bullets:
+        st.write("• " + b)
 
 st.divider()
 
-# -------------------------------------------------
-# Charts
-# -------------------------------------------------
+# =========================================================
+# CHARTS
+# =========================================================
 c1, c2 = st.columns(2)
 
 with c1:
     st.subheader(t("Origin Country Distribution", "Distribusi Negara Asal"))
     country_counts = filtered["country"].value_counts().reset_index()
     country_counts.columns = ["country", "count"]
-    fig_country = px.bar(country_counts, x="country", y="count")
-    st.plotly_chart(fig_country, use_container_width=True)
+    st.plotly_chart(px.bar(country_counts, x="country", y="count"), use_container_width=True)
 
 with c2:
     st.subheader(t("Top Routes", "Rute Teratas"))
     route_counts = filtered["route"].value_counts().reset_index()
     route_counts.columns = ["route", "count"]
-    fig_route = px.bar(route_counts, x="route", y="count")
-    st.plotly_chart(fig_route, use_container_width=True)
+    st.plotly_chart(px.bar(route_counts, x="route", y="count"), use_container_width=True)
 
 c3, c4 = st.columns(2)
 
 with c3:
     st.subheader(t("Satisfaction by Ticket Class", "Kepuasan per Kelas"))
-    fig_class = px.box(filtered, x="ticket_class", y="satisfaction")
-    st.plotly_chart(fig_class, use_container_width=True)
+    st.plotly_chart(px.box(filtered, x="ticket_class", y="satisfaction"), use_container_width=True)
 
 with c4:
     st.subheader(t("Satisfaction by Touchpoint", "Kepuasan per Touchpoint"))
-    fig_touch = px.box(filtered, x="touchpoint", y="satisfaction")
-    st.plotly_chart(fig_touch, use_container_width=True)
+    st.plotly_chart(px.box(filtered, x="touchpoint", y="satisfaction"), use_container_width=True)
 
 st.divider()
 
-# -------------------------------------------------
-# Pain points & Positives
-# -------------------------------------------------
+# =========================================================
+# PAIN POINTS & POSITIVES
+# =========================================================
 p1, p2 = st.columns(2)
 
 with p1:
     st.subheader(t("Top Pain Points", "Pain Point Teratas"))
     pp = filtered["pain_point"].value_counts().reset_index()
     pp.columns = ["pain_point", "count"]
-    fig_pp = px.bar(pp.head(10), x="pain_point", y="count")
-    st.plotly_chart(fig_pp, use_container_width=True)
+    st.plotly_chart(px.bar(pp.head(10), x="pain_point", y="count"), use_container_width=True)
 
 with p2:
     st.subheader(t("Top Positive Feedback", "Feedback Positif Teratas"))
     pf = filtered["positive_feedback"].value_counts().reset_index()
     pf.columns = ["positive_feedback", "count"]
-    fig_pf = px.bar(pf.head(10), x="positive_feedback", y="count")
-    st.plotly_chart(fig_pf, use_container_width=True)
+    st.plotly_chart(px.bar(pf.head(10), x="positive_feedback", y="count"), use_container_width=True)
 
 st.divider()
 
-# -------------------------------------------------
-# Recommendation panel (rule-based, conceptual)
-# -------------------------------------------------
+# =========================================================
+# RECOMMENDED ACTIONS (conceptual)
+# =========================================================
 st.subheader(t("Recommended Actions (Conceptual)", "Rekomendasi Aksi (Konseptual)"))
-
 if total == 0:
     st.info(t("No data after filters.", "Tidak ada data setelah filter."))
 else:
@@ -347,45 +392,108 @@ else:
           f"Uji coba peningkatan JourneySense pada rute: {worst_route}."),
         t(f"Fix the top friction: {top_pain}.",
           f"Prioritaskan perbaikan pain point utama: {top_pain}."),
-        t("Standardize a global-friendly tone (English-first) across key touchpoints.",
-          "Standarisasi tone komunikasi ramah global (English-first) pada touchpoint utama."),
-        t("Embed local cultural storytelling on high-tourist routes (lightweight, non-intrusive).",
-          "Integrasikan storytelling budaya lokal pada rute wisata (ringan dan tidak mengganggu).")
+        t("Standardize global-friendly communication tone across key touchpoints (English-first).",
+          "Standarisasi tone komunikasi ramah global pada touchpoint utama (English-first)."),
+        t("Embed lightweight local cultural storytelling on high-tourist routes.",
+          "Integrasikan storytelling budaya lokal yang ringan pada rute wisata."),
     ]
     for r in recs:
         st.write("• " + r)
 
 st.divider()
 
-# -------------------------------------------------
-# Export (for proposal evidence)
-# -------------------------------------------------
+# =========================================================
+# KAI STAR TOURISM RECOMMENDATIONS (Michelin-like, conceptual)
+# =========================================================
+st.subheader(t("Tourism Recommendations (KAI Star – Conceptual)", "Rekomendasi Pariwisata (KAI Star – Konseptual)"))
+
+if total == 0:
+    st.info(t("No data after filters.", "Tidak ada data setelah filter."))
+else:
+    # Pilih rute dominan dari data terfilter
+    primary_route = filtered["route"].value_counts().index[0]
+    dest_city = get_destination_city(primary_route)
+
+    leftA, rightA = st.columns([1, 2])
+
+    with leftA:
+        st.markdown("**" + t("Primary tourist route", "Rute utama wisatawan") + "**")
+        st.write(primary_route)
+
+        st.markdown("**" + t("Destination city", "Kota tujuan") + "**")
+        st.write(dest_city if dest_city else "-")
+
+        st.caption(
+            t(
+                "KAI Star is an internal conceptual rating (not a public official rating).",
+                "KAI Star adalah penilaian internal konseptual (bukan rating publik resmi)."
+            )
+        )
+
+        min_star = st.selectbox(
+            t("Minimum KAI Star", "Minimal KAI Star"),
+            options=[1, 2, 3],
+            index=0
+        )
+
+    with rightA:
+        if not dest_city:
+            st.warning(t(
+                "Destination city mapping not available for this route yet.",
+                "Mapping kota tujuan belum tersedia untuk rute ini."
+            ))
+        else:
+            rec_df = build_kai_star_table(dest_city)
+            if rec_df.empty:
+                st.info(t(
+                    "No recommendations available for this city yet.",
+                    "Belum ada rekomendasi untuk kota ini."
+                ))
+            else:
+                # filter by minimum star
+                def star_count(label: str) -> int:
+                    return label.count("★")
+
+                rec_df["_stars"] = rec_df["KAI Star"].apply(star_count)
+                rec_df = rec_df[rec_df["_stars"] >= min_star].drop(columns=["_stars"])
+
+                st.dataframe(rec_df, use_container_width=True, hide_index=True)
+                st.caption(
+                    t(
+                        "Conceptual criteria example: accessibility from station, safety, experience quality, memorability.",
+                        "Contoh kriteria konseptual: akses dari stasiun, keamanan, kualitas pengalaman, tingkat memorable."
+                    )
+                )
+
+st.divider()
+
+# =========================================================
+# EXPORT
+# =========================================================
 st.subheader(t("Export (for proposal appendix)", "Ekspor (untuk lampiran proposal)"))
+
+if total == 0:
+    insight_df = pd.DataFrame([{"note": "No data"}])
+else:
+    insight_df = pd.DataFrame([
+        {"metric": "Trips (records)", "value": total},
+        {"metric": "Avg satisfaction", "value": round(avg_sat, 2)},
+        {"metric": "Top origin", "value": top_country},
+        {"metric": "Top route", "value": top_route},
+        {"metric": "Worst touchpoint", "value": worst_touch},
+        {"metric": "Worst route", "value": worst_route},
+        {"metric": "Top pain point", "value": top_pain},
+    ])
 
 colA, colB = st.columns([1, 2])
 
 with colA:
-    # Build a small insights table
-    if total == 0:
-        insight_df = pd.DataFrame([{"note": "No data"}])
-    else:
-        insight_df = pd.DataFrame([
-            {"metric": "Trips (records)", "value": total},
-            {"metric": "Avg satisfaction", "value": round(avg_sat, 2)},
-            {"metric": "Top origin", "value": top_country},
-            {"metric": "Top route", "value": top_route},
-            {"metric": "Worst touchpoint", "value": worst_touch},
-            {"metric": "Worst route", "value": worst_route},
-            {"metric": "Top pain point", "value": top_pain},
-        ])
-
     st.download_button(
         label=t("Download filtered data (CSV)", "Unduh data terfilter (CSV)"),
         data=df_to_csv_bytes(filtered),
         file_name="journeysense_filtered_data.csv",
         mime="text/csv"
     )
-
     st.download_button(
         label=t("Download executive insights (CSV)", "Unduh ringkasan insight (CSV)"),
         data=df_to_csv_bytes(insight_df),
@@ -394,19 +502,18 @@ with colA:
     )
 
 with colB:
+    st.dataframe(insight_df, use_container_width=True, hide_index=True)
     st.markdown(
-        t(
-            "Use exported CSV as evidence for the appendix (conceptual prototype).",
-            "Gunakan CSV hasil ekspor sebagai bukti lampiran (prototype konseptual)."
+        "<div class='small-note'>"
+        + t(
+            "Use exports as appendix evidence (conceptual prototype).",
+            "Gunakan hasil ekspor sebagai bukti lampiran (prototype konseptual)."
         )
+        + "</div>",
+        unsafe_allow_html=True
     )
-    st.dataframe(insight_df, use_container_width=True)
 
-# -------------------------------------------------
-# Data preview (optional)
-# -------------------------------------------------
 with st.expander(t("Preview filtered data", "Lihat data terfilter")):
     st.dataframe(filtered, use_container_width=True)
 
-st.caption("© KAI JourneySense – conceptual dashboard prototype (proposal use).")
-
+st.caption("© KAI JourneySense – conceptual dashboard prototype (for proposal use).")
