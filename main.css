@@ -1,0 +1,288 @@
+/* =========================
+   Global + Base (CLEAN REV)
+========================= */
+:root {
+  --bg0: #0b1220;
+  --bg1: #0f1b2e;
+
+  --card: rgba(255, 255, 255, 0.055);
+  --cardHover: rgba(255, 255, 255, 0.075);
+
+  --text: #eaf1ff;
+  --muted: rgba(234, 241, 255, 0.72);
+  --muted2: rgba(234, 241, 255, 0.6);
+
+  --line: rgba(255, 255, 255, 0.1);
+  --line2: rgba(255, 255, 255, 0.07);
+
+  --accent: #2dd4bf; /* teal */
+  --accent2: #60a5fa; /* blue */
+
+  --shadowSoft: 0 10px 26px rgba(0, 0, 0, 0.28);
+  --shadowHero: 0 14px 40px rgba(0, 0, 0, 0.4);
+
+  --radius: 18px;
+}
+
+/* Page background (lebih halus, lebih clean) */
+.stApp {
+  background: radial-gradient(
+      900px 520px at 15% 12%,
+      rgba(96, 165, 250, 0.14),
+      transparent 58%
+    ),
+    radial-gradient(
+      820px 520px at 88% 18%,
+      rgba(45, 212, 191, 0.12),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+  color: var(--text);
+}
+
+/* Container spacing */
+.block-container {
+  padding-top: 1.1rem;
+  padding-bottom: 2rem;
+}
+
+/* =========================
+     Sidebar (lebih subtle)
+  ========================= */
+section[data-testid="stSidebar"] {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 18, 32, 0.92),
+    rgba(12, 24, 40, 0.92)
+  );
+  border-right: 1px solid var(--line2);
+}
+section[data-testid="stSidebar"] * {
+  color: var(--text);
+}
+section[data-testid="stSidebar"] .stCaption {
+  color: var(--muted) !important;
+}
+
+/* =========================
+     Inputs (lebih minimal)
+  ========================= */
+.stMultiSelect [data-baseweb="select"],
+.stSelectbox [data-baseweb="select"] {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+}
+
+.stDateInput input {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 12px !important;
+  color: var(--text) !important;
+}
+
+/* =========================
+     CLEAN TABS (penting untuk tampilan tab)
+  ========================= */
+.stTabs [data-baseweb="tab-list"] {
+  gap: 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 2px;
+}
+
+.stTabs [data-baseweb="tab"] {
+  font-size: 0.92rem;
+  font-weight: 560;
+  color: rgba(234, 241, 255, 0.62);
+  padding: 10px 2px;
+  background: transparent;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+  color: rgba(234, 241, 255, 0.92);
+}
+
+.stTabs [aria-selected="true"] {
+  color: rgba(234, 241, 255, 0.98) !important;
+  border-bottom: 3px solid var(--accent);
+  background: transparent;
+}
+
+/* =========================
+     HERO (lebih clean, less noise)
+  ========================= */
+.kai-hero {
+  background: linear-gradient(
+      120deg,
+      rgba(96, 165, 250, 0.16),
+      rgba(45, 212, 191, 0.14)
+    ),
+    rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadowHero);
+  border-radius: 24px;
+  padding: 24px 26px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* pola watermark dibuat jauh lebih subtle */
+.kai-hero::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(
+    420px 220px at 20% 10%,
+    rgba(255, 255, 255, 0.1),
+    transparent 60%
+  );
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.kai-kicker {
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.kai-title {
+  font-size: 2rem;
+  font-weight: 820;
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+
+.kai-subtitle {
+  font-size: 0.98rem;
+  color: rgba(234, 241, 255, 0.86);
+  margin-bottom: 14px;
+}
+
+.kai-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(234, 241, 255, 0.88);
+  backdrop-filter: blur(10px);
+  transition: transform 0.14s ease, background 0.14s ease, border 0.14s ease;
+}
+
+.kai-badge:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.075);
+  border: 1px solid rgba(45, 212, 191, 0.22);
+}
+
+/* =========================
+     SECTION
+  ========================= */
+.kai-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 0 10px 0;
+}
+
+.kai-section .label {
+  font-weight: 740;
+  letter-spacing: 0.02em;
+  color: rgba(234, 241, 255, 0.94);
+}
+
+.kai-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  color: rgba(234, 241, 255, 0.9);
+  font-size: 0.78rem;
+}
+
+/* Note (lebih soft) */
+.kai-note {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: rgba(234, 241, 255, 0.86);
+}
+
+/* =========================
+     KPI Cards (lebih clean & ringan)
+  ========================= */
+.kai-kpi {
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadowSoft);
+  border-radius: var(--radius);
+  padding: 16px 16px 12px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.14s ease, border 0.14s ease, background 0.14s ease;
+}
+
+.kai-kpi:hover {
+  transform: translateY(-3px);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: var(--cardHover);
+}
+
+.kai-kpi .label {
+  font-size: 0.82rem;
+  color: var(--muted2);
+  margin-bottom: 8px;
+}
+
+.kai-kpi .value {
+  font-size: 1.32rem;
+  font-weight: 820;
+  color: rgba(234, 241, 255, 0.98);
+  margin-bottom: 6px;
+}
+
+.kai-kpi .hint {
+  font-size: 0.78rem;
+  color: rgba(234, 241, 255, 0.62);
+}
+
+/* Divider */
+hr,
+.stDivider {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* Buttons (lebih clean) */
+.stButton > button {
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--text) !important;
+  transition: transform 0.14s ease, background 0.14s ease, border 0.14s ease;
+}
+
+.stButton > button:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(45, 212, 191, 0.22) !important;
+}
+
+/* Dataframe */
+[data-testid="stDataFrame"] {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
