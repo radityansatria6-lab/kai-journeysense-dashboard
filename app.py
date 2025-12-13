@@ -3,6 +3,21 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 from typing import Optional
+import os
+
+# =========================
+# Plotly Theme Helper
+# =========================
+def plotly_theme(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=10, t=40, b=10),
+        font=dict(size=12),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    return fig
 
 # =========================
 # CSS Loader
@@ -56,6 +71,10 @@ def kpi_card(title: str, value: str, hint: str = ""):
 # =========================
 st.set_page_config(page_title="KAI JourneySense Dashboard", page_icon="🚆", layout="wide")
 load_css("styles/main.css")
+
+# DEBUG SIGNATURE (biar yakin file yang running benar)
+st.sidebar.caption("✅ Running file: JourneySense app.py (v1.1 - tabs + plotly theme)")
+st.sidebar.caption(f"📌 App path: {os.path.abspath(__file__)}")
 
 # =========================
 # Constants & Concept Data
@@ -245,8 +264,16 @@ def build_kai_star_table(city: str) -> pd.DataFrame:
 def build_city_map_df(city: str) -> pd.DataFrame:
     c = CITY_COORDS.get(city)
     if not c:
-        return pd.DataFrame(columns=["city","lat","lon"])
-    return pd.DataFrame([{"city": city, "lat": c["lat"], "lon": c["lon"]}])
+        return pd.DataFrame(columns=["lat", "lon"])
+    return pd.DataFrame([{"lat": float(c["lat"]), "lon": float(c["lon"])}])
+
+def safe_map(city: str):
+    """Kompatibel berbagai versi Streamlit: tidak pakai latitude/longitude kw args."""
+    df_map = build_city_map_df(city)
+    if df_map.empty:
+        st.info("Peta belum tersedia.")
+        return
+    st.map(df_map[["lat", "lon"]])
 
 def build_itinerary_df(city: str) -> pd.DataFrame:
     items = KAI_DAY_ITINERARY.get(city, [])
@@ -289,10 +316,16 @@ sel_purpose = st.sidebar.multiselect("Purpose", purposes, default=purposes)
 
 min_date = df["date"].min()
 max_date = df["date"].max()
-date_range = st.sidebar.date_input("Date range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
 
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start_date, end_date = date_range
+date_range = st.sidebar.date_input(
+    "Date range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
+    start_date, end_date = date_range[0], date_range[1]
 else:
     start_date, end_date = min_date, max_date
 
@@ -317,19 +350,20 @@ low_sat_share = (filtered["satisfaction"] < 4.0).mean() * 100 if total else 0.0
 # =========================
 if page == "Page 1 — Overview":
     hero(
-        title="KAI JourneySense Dashboard",
-        subtitle="Data-driven journey experience & tourism recommendations for international travelers (conceptual prototype).",
-        kicker="KAI Ideation Challenge 2025 • Global Branding, Local Hearts",
-        badges=["🚆 Experience", "📊 Insights", "🌏 Tourism", "✨ KAI Star"]
-    )
+    title="KAI JourneySense Dashboard",
+    subtitle="Data-driven journey experience & tourism recommendations for international travelers (conceptual prototype).",
+    kicker="KAI Ideation Challenge 2025 • Global Branding, Local Hearts",
+    badges=["Experience", "Insights", "Tourism", "KAI Star"]
+)
+
 
     st.markdown("""
-    <div class="kai-note">
-      <b>Catatan:</b> Dashboard ini adalah prototipe konseptual untuk kebutuhan proposal (bukan data operasional resmi).
-    </div>
-    """, unsafe_allow_html=True)
+<div class="kai-note">
+  <b>Catatan:</b> Dashboard ini adalah prototipe konseptual untuk kebutuhan proposal (bukan data operasional resmi).
+</div>
+""", unsafe_allow_html=True)
 
-    # KPI cards
+
     section("Key Performance Indicators", chip="Overview")
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1: kpi_card("Trips (records)", f"{total:,}", "Filtered view")
@@ -340,72 +374,110 @@ if page == "Page 1 — Overview":
 
     st.divider()
 
-    # Customer recommendations
-    section("Customer Recommendations", chip="Actionable")
-    if total == 0:
-        st.info("Tidak ada data setelah filter.")
-    else:
-        worst_touch = filtered.groupby("touchpoint")["satisfaction"].mean().sort_values().index[0]
-        worst_route = filtered.groupby("route")["satisfaction"].mean().sort_values().index[0]
-        top_pain = filtered["pain_point"].value_counts().index[0]
+    tab1, tab2, tab3 = st.tabs(["⭐ Overview", "🎯 Recommendations", "🗺️ Tourism"])
 
-        recs = [
-            f"Gunakan aplikasi/website KAI untuk info rute terpandu pada: {worst_route}.",
-            "Datang lebih awal ke stasiun untuk memudahkan navigasi (terutama jam ramai).",
-            f"Kendala umum yang perlu diantisipasi: {top_pain}. Siapkan alternatif (bahasa/pembayaran/jadwal).",
-            f"Jika ragu, manfaatkan petugas/Customer Service—terutama pada: {worst_touch}.",
-        ]
-        for r in recs:
-            st.write("• " + r)
+    with tab1:
+        section("Snapshot", chip="Quick insights")
+        colx, coly = st.columns([1.2, 1])
+        with colx:
+            st.markdown(
+                """
+                <div class="kai-note">
+                <b>Focus hari ini:</b> Lihat rute & touchpoint dengan kepuasan terendah untuk prioritas perbaikan,
+                lalu dorong rekomendasi destinasi berbasis “KAI Star” di kota tujuan.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        with coly:
+            st.markdown("**Quick Actions**")
+            a, b, c = st.columns(3)
+            with a:
+                st.button("Reset filters", use_container_width=True)
+            with b:
+                st.button("Focus low sat", use_container_width=True)
+            with c:
+                st.button("Top route", use_container_width=True)
 
-    st.divider()
+    with tab2:
+        section("Customer Recommendations", chip="Actionable")
+        if total == 0:
+            st.info("Tidak ada data setelah filter.")
+        else:
+            worst_touch = filtered.groupby("touchpoint")["satisfaction"].mean().sort_values().index[0]
+            worst_route = filtered.groupby("route")["satisfaction"].mean().sort_values().index[0]
+            top_pain = filtered["pain_point"].value_counts().index[0]
 
-    # Tourism recommendations
-    section("KAI Star Tourism Recommendations", chip="Conceptual")
-    if total == 0:
-        st.info("Tidak ada data setelah filter.")
-    else:
-        primary_route = filtered["route"].value_counts().index[0]
-        dest_city = get_destination_city(primary_route)
+            st.markdown("**Prioritas perbaikan (berdasarkan data filter saat ini):**")
+            st.write(f"• Touchpoint terlemah: **{worst_touch}**")
+            st.write(f"• Rute dengan kepuasan terendah: **{worst_route}**")
+            st.write(f"• Pain point paling sering: **{top_pain}**")
 
-        leftA, midA, rightA = st.columns([1, 1.1, 1.9])
+            st.markdown("---")
+            st.markdown("**Rekomendasi untuk wisatawan:**")
+            recs = [
+                f"Gunakan aplikasi/website KAI untuk info rute terpandu pada: {worst_route}.",
+                "Datang lebih awal ke stasiun untuk memudahkan navigasi (terutama jam ramai).",
+                f"Kendala umum yang perlu diantisipasi: {top_pain}. Siapkan alternatif (bahasa/pembayaran/jadwal).",
+                f"Jika ragu, manfaatkan petugas/Customer Service—terutama pada: {worst_touch}.",
+            ]
+            for r in recs:
+                st.write("• " + r)
 
-        with leftA:
-            st.markdown("**Primary tourist route**")
-            st.write(primary_route)
-            st.markdown("**Destination city**")
-            st.write(dest_city if dest_city else "-")
-            st.caption("KAI Star = penilaian internal konseptual (mirip konsep Michelin, namun untuk destinasi).")
-            min_star = st.selectbox("Minimum KAI Star", [1, 2, 3], index=0)
+    with tab3:
+        section("KAI Star Tourism Recommendations", chip="Interactive cards")
+        if total == 0:
+            st.info("Tidak ada data setelah filter.")
+        else:
+            primary_route = filtered["route"].value_counts().index[0]
+            dest_city = get_destination_city(primary_route)
 
-        with midA:
-            st.markdown("**Destination map**")
-            if not dest_city or dest_city not in CITY_COORDS:
-                st.info("Peta belum tersedia untuk destinasi ini.")
-            else:
-                st.map(build_city_map_df(dest_city), latitude="lat", longitude="lon", size=70)
-                st.caption("Penanda kota (perkiraan, konseptual).")
+            leftA, midA = st.columns([1.15, 1])
+            with leftA:
+                st.markdown("**Primary tourist route**")
+                st.write(primary_route)
+                st.markdown("**Destination city**")
+                st.write(dest_city if dest_city else "-")
+                min_star = st.select_slider("Minimum KAI Star", options=[1, 2, 3], value=2)
 
-        with rightA:
-            if not dest_city:
-                st.warning("Mapping kota tujuan belum tersedia.")
-            else:
-                rec_df = build_kai_star_table(dest_city)
-                if rec_df.empty:
-                    st.info("Belum ada rekomendasi untuk kota ini.")
+            with midA:
+                st.markdown("**Destination map**")
+                if not dest_city or dest_city not in CITY_COORDS:
+                    st.info("Peta belum tersedia untuk destinasi ini.")
                 else:
-                    rec_df["_stars"] = rec_df["KAI Star"].apply(lambda s: s.count("★"))
-                    rec_df = rec_df[rec_df["_stars"] >= min_star].drop(columns=["_stars"])
-                    st.dataframe(rec_df, use_container_width=True, hide_index=True)
+                    safe_map(dest_city)
+                    st.caption("Penanda kota (perkiraan, konseptual).")
 
-                    st.markdown("#### Itinerary 1 Hari (Konseptual)")
-                    iti_df = build_itinerary_df(dest_city)
-                    st.dataframe(iti_df, use_container_width=True, hide_index=True)
-                    st.caption("Itinerary dapat disesuaikan dengan jadwal kereta & profil wisatawan.")
+            st.markdown("### ⭐ Rekomendasi Destinasi (KAI Star)")
+            rec_df = build_kai_star_table(dest_city) if dest_city else pd.DataFrame()
+            if rec_df.empty:
+                st.info("Belum ada rekomendasi untuk kota ini.")
+            else:
+                rec_df["_stars"] = rec_df["KAI Star"].apply(lambda s: s.count("★"))
+                rec_df = rec_df[rec_df["_stars"] >= min_star].drop(columns=["_stars"])
+
+                cols = st.columns(3)
+                for i, row in enumerate(rec_df.to_dict("records")):
+                    with cols[i % 3]:
+                        st.markdown(
+                            f"""
+                            <div class="kai-kpi" style="min-height:170px">
+                              <div class="label">{row["KAI Star"]}</div>
+                              <div class="value" style="font-size:1.05rem">{row["Tempat"]}</div>
+                              <div class="hint"><b>Kategori:</b> {row["Kategori"]}</div>
+                              <div class="hint" style="margin-top:6px">{row["Alasan singkat"]}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                st.markdown("### 🗓️ Itinerary 1 Hari (Konseptual)")
+                iti_df = build_itinerary_df(dest_city)
+                st.dataframe(iti_df, use_container_width=True, hide_index=True)
+                st.caption("Itinerary dapat disesuaikan dengan jadwal kereta & profil wisatawan.")
 
     st.divider()
 
-    # Export
     section("Export (for Appendix)", chip="CSV")
     insight_df = pd.DataFrame([
         {"metric": "Trips", "value": total},
@@ -416,10 +488,18 @@ if page == "Page 1 — Overview":
 
     colA, colB = st.columns([1, 2])
     with colA:
-        st.download_button("Download filtered data (CSV)", df_to_csv_bytes(filtered),
-                           file_name="journeysense_filtered_data.csv", mime="text/csv")
-        st.download_button("Download executive insights (CSV)", df_to_csv_bytes(insight_df),
-                           file_name="journeysense_executive_insights.csv", mime="text/csv")
+        st.download_button(
+            "Download filtered data (CSV)",
+            df_to_csv_bytes(filtered),
+            file_name="journeysense_filtered_data.csv",
+            mime="text/csv"
+        )
+        st.download_button(
+            "Download executive insights (CSV)",
+            df_to_csv_bytes(insight_df),
+            file_name="journeysense_executive_insights.csv",
+            mime="text/csv"
+        )
     with colB:
         st.dataframe(insight_df, use_container_width=True, hide_index=True)
 
@@ -454,70 +534,84 @@ else:
 
     section("Demand & Profile", chip="Charts")
     c1, c2 = st.columns(2)
+
     with c1:
         st.subheader("Origin Country Distribution")
         cc = filtered["country"].value_counts().reset_index()
         cc.columns = ["country", "count"]
-        st.plotly_chart(px.bar(cc, x="country", y="count"), use_container_width=True)
+        fig = px.bar(cc, x="country", y="count")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     with c2:
         st.subheader("Purpose Distribution")
         pc = filtered["purpose"].value_counts().reset_index()
         pc.columns = ["purpose", "count"]
-        st.plotly_chart(px.pie(pc, names="purpose", values="count"), use_container_width=True)
+        fig = px.pie(pc, names="purpose", values="count")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     st.divider()
 
     section("Route & Class Mix", chip="Breakdown")
     c3, c4 = st.columns(2)
+
     with c3:
         st.subheader("Top Routes")
         rc = filtered["route"].value_counts().reset_index()
         rc.columns = ["route", "count"]
-        st.plotly_chart(px.bar(rc, x="route", y="count"), use_container_width=True)
+        fig = px.bar(rc, x="route", y="count")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     with c4:
         st.subheader("Ticket Class Mix")
         tc = filtered["ticket_class"].value_counts().reset_index()
         tc.columns = ["ticket_class", "count"]
-        st.plotly_chart(px.pie(tc, names="ticket_class", values="count"), use_container_width=True)
+        fig = px.pie(tc, names="ticket_class", values="count")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     st.divider()
 
     section("Experience Quality", chip="Satisfaction")
     c5, c6 = st.columns(2)
+
     with c5:
         st.subheader("Satisfaction by Ticket Class")
-        st.plotly_chart(px.box(filtered, x="ticket_class", y="satisfaction"), use_container_width=True)
+        fig = px.box(filtered, x="ticket_class", y="satisfaction")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     with c6:
         st.subheader("Satisfaction by Touchpoint")
-        st.plotly_chart(px.box(filtered, x="touchpoint", y="satisfaction"), use_container_width=True)
+        fig = px.box(filtered, x="touchpoint", y="satisfaction")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     st.divider()
 
     section("Voice of Tourist", chip="Top issues")
     c7, c8 = st.columns(2)
+
     with c7:
         st.subheader("Top Pain Points")
         pp = filtered["pain_point"].value_counts().reset_index()
         pp.columns = ["pain_point", "count"]
-        st.plotly_chart(px.bar(pp.head(10), x="pain_point", y="count"), use_container_width=True)
+        fig = px.bar(pp.head(10), x="pain_point", y="count")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     with c8:
         st.subheader("Top Positive Feedback")
         pf = filtered["positive_feedback"].value_counts().reset_index()
         pf.columns = ["positive_feedback", "count"]
-        st.plotly_chart(px.bar(pf.head(10), x="positive_feedback", y="count"), use_container_width=True)
+        fig = px.bar(pf.head(10), x="positive_feedback", y="count")
+        st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     st.divider()
 
     section("Trend", chip="Time series")
     st.subheader("Satisfaction Trend Over Time")
     trend = filtered.groupby("date", as_index=False)["satisfaction"].mean().sort_values("date")
-    st.plotly_chart(px.line(trend, x="date", y="satisfaction"), use_container_width=True)
+    fig = px.line(trend, x="date", y="satisfaction")
+    st.plotly_chart(plotly_theme(fig), use_container_width=True)
 
     with st.expander("Preview filtered data"):
         st.dataframe(filtered, use_container_width=True)
 
     st.caption("© KAI JourneySense – conceptual dashboard prototype (proposal use).")
+
